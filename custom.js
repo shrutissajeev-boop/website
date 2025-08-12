@@ -1,196 +1,169 @@
 (async () => {
-  const whichToInsert = 'describe';
-  const describePrompt = `Write a chill, deep-voiced song about Friday night lights. Tone: nostalgic, intimate, slightly melancholic. Structure: Verse 1, Pre-Chorus, Chorus, Verse 2, Bridge, Chorus. Mention "Friday night lights", "city glow", "slow car", "neon". Keep it singable and ~150-220 words.`;
-  const lyricsText = `Verse 1
+  const cfg = {
+    songTitle: 'Java Dreams',
+    whichToInsert: 'describe', // 'describe' or 'lyrics'
+    describePrompt: `Write a chill, deep-voiced song about Friday night lights. Tone: nostalgic, intimate, slightly melancholic. Structure: Verse 1, Pre-Chorus, Chorus, Verse 2, Bridge, Chorus. Mention "Friday night lights", "city glow", "slow car", "neon". Keep it singable and ~150-220 words.`,
+    lyricsText: `Verse 1
 Slow headlights glide under the Friday night lights,
 We ride the quiet streets, neon humming through the night.
 Your hand on mine, heartbeat keeping time,
 City hums like a lullaby, everything feels right.
 
-Pre-Chorus
-And I can see the past in the glow,
-Holding on to moments we already know.
-
 Chorus
 Friday night lights, pulling us close,
-Soft shadows dancing where the moonlight goes.
-Whispers on the radio, slow and low,
-We let the world fade out and just let go.
+Soft shadows dancing where the moonlight goes.` ,
+    stylesToAdd: ['vinyl samples', 'calm', 'lofi'],
+    waitBetweenStyleMs: 250,
+    openAdvanced: true,
+    openMore: true,
+    observerTimeoutMs: 60000
+  };
 
-Verse 2
-Windows fog with secrets we don't need to say,
-Slow songs and cigarette ash, let the hours sway.
-Eyes meet in the mirror of the passing shops,
-Time folds gently and nothing ever stops.
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-Bridge
-We'll keep the map of this road in our chest,
-A souvenir of nights that taught us how to rest.
+  function setReactValue(el, value) {
+    if (!el) return;
+    const tag = el.tagName;
+    try {
+      if (tag === 'TEXTAREA') {
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+        setter ? setter.call(el, value) : (el.value = value);
+      } else if (tag === 'INPUT') {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        setter ? setter.call(el, value) : (el.value = value);
+      } else {
+        el.innerText = value;
+      }
+    } catch (e) {
+      try { el.value = value; } catch(e){}
+    }
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
 
-(Chorus x2)`;
+  function clickByPartialText(text) {
+    const list = Array.from(document.querySelectorAll('button, [role="button"], a'));
+    const found = list.find(el => ((el.textContent || el.innerText || '').toLowerCase().includes(text.toLowerCase())));
+    if (found) { found.click(); return true; }
+    return false;
+  }
 
-  const textToInsert = whichToInsert === 'lyrics' ? lyricsText : describePrompt;
+  function findCreateBtn() {
+    const list = Array.from(document.querySelectorAll('button, [role="button"], a'));
+    return list.find(el => ((el.textContent || el.innerText || '').toLowerCase().includes('create'))
+      || ((el.getAttribute && (el.getAttribute('aria-label') || '').toLowerCase().includes('create'))));
+  }
+
+  async function addStylesAsChips(styleEl, styles) {
+    styleEl.focus();
+    for (const s of styles) {
+      setReactValue(styleEl, s);
+      styleEl.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      styleEl.dispatchEvent(new Event('change', { bubbles: true }));
+      styleEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+      styleEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+      await sleep(cfg.waitBetweenStyleMs);
+    }
+  }
 
   function findTextareaOrEditable() {
     const selectors = [
-      'textarea[placeholder*="lyrics"]',
-      'textarea[placeholder*="Add your own lyrics"]',
       'textarea[data-testid*="prompt-input-textarea"]',
+      'textarea[placeholder*="Describe your song"]',
+      'textarea[placeholder*="Add your own lyrics"]',
       'textarea.custom-textarea',
-      'textarea'
+      'textarea',
+      '[contenteditable="true"]'
     ];
     for (const s of selectors) {
       const el = document.querySelector(s);
       if (el) return el;
     }
-    if (window.$0 && (window.$0.tagName === 'TEXTAREA' || window.$0.isContentEditable)) return window.$0;
-    const ce = document.querySelector('[contenteditable="true"]');
-    if (ce) return ce;
     return null;
   }
 
-  const ta = findTextareaOrEditable();
-  if (!ta) {
-    console.error('No textarea or contenteditable element found. Select it in Elements and try again.');
-    return;
-  }
-
-  if (ta.tagName === 'TEXTAREA' || ta.tagName === 'INPUT') {
-    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-    if (nativeSetter) nativeSetter.call(ta, textToInsert);
-    else ta.value = textToInsert;
-    ta.dispatchEvent(new Event('input', { bubbles: true }));
-    ta.dispatchEvent(new Event('change', { bubbles: true }));
-    console.log('Inserted text into textarea.');
-  } else if (ta.isContentEditable) {
-    ta.focus();
-    ta.innerText = textToInsert;
-    ta.dispatchEvent(new InputEvent('input', { bubbles: true }));
-    ta.dispatchEvent(new Event('change', { bubbles: true }));
-    console.log('Inserted text into contenteditable element.');
-  } else {
-    console.warn('Found element but it is not a textarea or contenteditable. Element:', ta);
-  }
-
-  function findCreateBtn() {
-    const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
-    return candidates.find(el => {
-      const txt = (el.textContent || el.innerText || '').trim().toLowerCase();
-      if (txt.includes('create')) return true;
-      const aria = (el.getAttribute('aria-label') || '').toLowerCase();
-      if (aria.includes('create')) return true;
-      if ((el.dataset && (el.dataset.testid || '').toLowerCase().includes('create'))) return true;
-      return false;
-    });
-  }
-
-  let btn = findCreateBtn();
-  if (!btn) {
-    console.warn('Create button not found automatically. Please inspect the Create button and store as $0, then run this script again.');
-    return;
-  }
-
-  function isEnabled(el) {
-    if (el.disabled) return false;
-    if (el.getAttribute('aria-disabled') === 'true') return false;
-    const cls = (el.className || '').toString().toLowerCase();
-    if (cls.includes('disabled') || cls.includes('opacity-')) {
-      return !cls.includes('disabled');
-    }
-    return true;
-  }
-
-  if (!isEnabled(btn)) {
-    await new Promise(resolve => {
-      const obs = new MutationObserver(() => {
-        if (isEnabled(btn)) {
-          obs.disconnect();
-          resolve();
+  const observer = new MutationObserver((mutations) => {
+    try {
+      if (!cfg.songTitle) return;
+      for (const m of mutations) {
+        for (const n of m.addedNodes) {
+          if (n.nodeType !== 1) continue;
+          if ((n.innerText || '').includes(cfg.songTitle)) {
+            console.log('Published song element detected (added node):', n);
+            observer.disconnect();
+            return;
+          }
         }
-      });
-      obs.observe(btn, { attributes: true, attributeFilter: ['disabled', 'class', 'aria-disabled'] });
-      setTimeout(() => { obs.disconnect(); resolve(); }, 5000);
-    });
-  }
+      }
+      const scan = Array.from(document.querySelectorAll('a, div, span, button'))
+        .find(e => (e.innerText || '').includes(cfg.songTitle)
+                   && !e.closest('form') && !e.matches('input, textarea'));
+      if (scan) {
+        console.log('Published song element detected (scan):', scan);
+        observer.disconnect();
+      }
+    } catch (e) {}
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  window._sunoObserver = observer;
 
-  btn.click();
-  console.log('Clicked Create button (or attempted to). If nothing happened, check for validation or credits.');
-})();
+  try {
+    if (cfg.openAdvanced) clickByPartialText('Advanced Options');
+    if (cfg.openMore) clickByPartialText('More Options');
+    await sleep(500);
 
-
-
-/*/style options/*/
-(() => {
-  const stylesToAdd = ['vinyl samples', 'calm', 'lofi']; 
-  const toggleAdvanced = true;  
-  const toggleMore = true;      
-
-  function setStyles(styles) {
-    const input = document.querySelector('textarea[placeholder*="Enter style tags"], input[placeholder*="Enter style tags"]');
-    if (!input) {
-      console.error('Styles input not found.');
-      return;
+    const ta = findTextareaOrEditable();
+    if (!ta) console.warn('No lyrics/describe textarea or contenteditable found.');
+    else {
+      const textToInsert = cfg.whichToInsert === 'lyrics' ? cfg.lyricsText : cfg.describePrompt;
+      if (ta.tagName === 'TEXTAREA' || ta.tagName === 'INPUT') {
+        setReactValue(ta, textToInsert);
+      } else {
+        ta.focus();
+        ta.innerText = textToInsert;
+        ta.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        ta.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      console.log('Inserted prompt/lyrics.');
     }
-    const nativeSetter = Object.getOwnPropertyDescriptor(input.__proto__, 'value')?.set;
-    const value = styles.join(', ');
-    if (nativeSetter) nativeSetter.call(input, value);
-    else input.value = value;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-    console.log('Styles set:', value);
-  }
 
-  function clickIfFound(selector, label = '') {
-    const el = document.querySelector(selector);
-    if (el) {
-      el.click();
-      console.log(label || selector, 'clicked.');
+    const styleSelector = 'textarea[placeholder*="Enter style tags"], input[placeholder*="Enter style tags"], input[aria-label*="style"]';
+    const styleEl = document.querySelector(styleSelector);
+    if (styleEl) {
+      await addStylesAsChips(styleEl, cfg.stylesToAdd);
+      console.log('Styles added as chips.');
     } else {
-      console.warn(label || selector, 'not found.');
+      console.warn('Styles input not found; attempting to set any style input value directly.');
+      const fallback = document.querySelector('textarea, input');
+      if (fallback) setReactValue(fallback, cfg.stylesToAdd.join(', '));
     }
-  }
 
-  setStyles(stylesToAdd);
-
-  if (toggleAdvanced) clickIfFound('button:has(span:contains("Advanced Options"))', 'Advanced Options');
-  if (toggleMore) clickIfFound('button:has(span:contains("More Options"))', 'More Options');
-
-})();
-/*/ song title/*/
-(() => {
-  const songTitle = 'Java Dreams';
-  const stylesToAdd = ['vinyl samples', 'calm', 'lofi'];
-
-  function setReactValue(el, value) {
-    const setter = Object.getOwnPropertyDescriptor(el.__proto__, 'value')?.set;
-    setter ? setter.call(el, value) : el.value = value;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  function clickButtonByText(text) {
-    const btn = Array.from(document.querySelectorAll('button, [role="button"]'))
-      .find(e => (e.textContent || '').trim().toLowerCase() === text.toLowerCase());
-    if (btn) {
-      btn.click();
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  clickButtonByText('Advanced Options');
-  clickButtonByText('More Options');
-
-  setTimeout(() => {
-    const titleInput = document.querySelector('input[placeholder="Enter song title"]');
+    await sleep(200);
+    const titleInput = document.querySelector('input[placeholder*="song title"], input[placeholder*="Enter song title"], input[aria-label*="Song Title"]');
     if (titleInput) {
-      setReactValue(titleInput, songTitle);
+      setReactValue(titleInput, cfg.songTitle);
+      console.log('Song title set.');
+    } else {
+      console.warn('Song title input not found.');
     }
 
-    const styleInput = document.querySelector('textarea[placeholder*="Enter style tags"], input[placeholder*="Enter style tags"]');
-    if (styleInput) {
-      setReactValue(styleInput, stylesToAdd.join(', '));
+    await sleep(200);
+    const createBtn = findCreateBtn();
+    if (createBtn) {
+      createBtn.click();
+      console.log('Clicked Create button.');
+    } else {
+      console.warn('Create button not found automatically.');
     }
-  }, 500);
+
+    if (cfg.observerTimeoutMs) {
+      setTimeout(() => {
+        if (window._sunoObserver) {
+          try { window._sunoObserver.disconnect(); console.log('Observer disconnected after timeout.'); } catch(e){}
+        }
+      }, cfg.observerTimeoutMs);
+    }
+  } catch (err) {
+    console.error('Automation error:', err);
+  }
 })();
