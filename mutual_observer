@@ -1,0 +1,21 @@
+const targetNode = document.body;
+const config = {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  characterData: true
+};
+const callback = (mutationsList, observer) => {
+  for (const mutation of mutationsList) {
+    if (mutation.type === 'childList') {
+      console.log('Child node(s) added or removed:', mutation);
+    } else if (mutation.type === 'attributes') {
+      console.log(`Attribute "${mutation.attributeName}" changed:`, mutation);
+    } else if (mutation.type === 'characterData') {
+      console.log('Text content changed:', mutation);
+    }
+  }
+};
+const observer = new MutationObserver(callback);
+observer.observe(targetNode, config);
+console.log('MutationObserver is now watching for changes...');
